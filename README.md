@@ -1,8 +1,7 @@
 Mongogo
 =======
 
-Mongogo is a MongoDB driver for the Go programming language
-(http://golang.org/).
+Mongogo is a MongoDB driver for the [Go programming language](http://golang.org/).
 
 This project is still in development. It's not well tested, but the basics seem to
 work well enough.
@@ -10,8 +9,7 @@ work well enough.
 Dependencies
 ------------
 
-Mongogo has one dependency outside of the core libraries:
-edsrzf/go-bson
+Mongogo's sole external dependency is [Go-BSON](edsrzf/go-bson).
 
 You can install it with goinstall by running
     goinstall github.com/edsrzf/go-bson
