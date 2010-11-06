@@ -9,7 +9,7 @@ work well enough.
 Dependencies
 ------------
 
-Mongogo's sole external dependency is [Go-BSON](edsrzf/go-bson).
+Mongogo's sole external dependency is [Go-BSON](go-bson).
 
 You can install it with goinstall by running
     goinstall github.com/edsrzf/go-bson
