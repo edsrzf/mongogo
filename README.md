@@ -37,7 +37,7 @@ Insert a document into the collection:
 Query the database:
 
     q := mongo.Query{"title": "Hello"}
-    cursor := col.Query(q, 0, 0)
+    cursor := col.Find(q, 0, 0)
     defer cursor.Close()
 
 See the documentation in the source for more information.

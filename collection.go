@@ -93,9 +93,9 @@ func (c *Collection) Insert(doc bson.Doc) os.Error {
 	return c.db.conn.sendMessage(2002, 0, payload)
 }
 
-// Query searches c for any documents matching a query. It skips the first skip
+// Find searches c for any documents matching a query. It skips the first skip
 // documents and limits the search to limit.
-func (c *Collection) Query(query Query, skip, limit int32) (*Cursor, os.Error) {
+func (c *Collection) Find(query Query, skip, limit int32) (*Cursor, os.Error) {
 	conn := c.db.conn
 	data, err := bson.Marshal(bson.Doc(query))
 	if err != nil {
@@ -125,12 +125,12 @@ func (c *Collection) Query(query Query, skip, limit int32) (*Cursor, os.Error) {
 
 // FindAll returns all documents in c matching a query.
 func (c *Collection) FindAll(query Query) (*Cursor, os.Error) {
-	return c.Query(query, 0, 0)
+	return c.Find(query, 0, 0)
 }
 
 // FindOne returns the first document in c that matches a query.
 func (c *Collection) FindOne(query Query) (bson.Doc, os.Error) {
-	cursor, err := c.Query(query, 0, 1)
+	cursor, err := c.Find(query, 0, 1)
 	if err != nil {
 		return nil, err
 	}
