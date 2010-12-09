@@ -96,12 +96,29 @@ func (c *Collection) Insert(doc bson.Doc) os.Error {
 // Find searches c for any documents matching a query. It skips the first skip
 // documents and limits the search to limit.
 func (c *Collection) Find(query Query, skip, limit int32) (*Cursor, os.Error) {
+	return c.FindFields(query, nil, skip, limit)
+}
+
+// FindFields performs a query that returns only specified fields. It skips the
+// first skip documents and limits the search to limit.
+// The fields specified can be inclusive or exclusive, but not both. That is,
+// the values in the fields parameter must be all true or all false with no
+// mixing. Fields with true values will be returned, while fields with false
+// values will be excluded.
+func (c *Collection) FindFields(query Query, fields map[string]interface{}, skip, limit int32) (*Cursor, os.Error) {
 	conn := c.db.conn
 	data, err := bson.Marshal(bson.Doc(query))
 	if err != nil {
 		return nil, err
 	}
-	cap := headerSize + 4 + len(c.fullName) + 8 + len(data)
+	var fieldData []byte
+	if fields != nil {
+		fieldData, err = bson.Marshal(bson.Doc(fields))
+		if err != nil {
+			return nil, err
+		}
+	}
+	cap := headerSize + 4 + len(c.fullName) + 8 + len(data) + len(fieldData)
 	payload := make([]byte, headerSize, cap)
 	buf := bytes.NewBuffer(payload[headerSize:])
 	// TODO(eds): Consider supporting flags
@@ -110,6 +127,7 @@ func (c *Collection) Find(query Query, skip, limit int32) (*Cursor, os.Error) {
 	binary.Write(buf, order, skip)
 	binary.Write(buf, order, limit)
 	buf.Write(data)
+	buf.Write(fieldData)
 	payload = payload[:cap]
 	if err := conn.sendMessage(2004, 0, payload); err != nil {
 		return nil, err
