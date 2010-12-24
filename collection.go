@@ -141,6 +141,15 @@ func (c *Collection) FindFields(query Query, fields map[string]interface{}, skip
 	return &Cursor{c, reply.cursorID, 0, reply.docs}, nil
 }
 
+func (c *Collection) FindOneFields(query Query, fields map[string]interface{}) (bson.Doc, os.Error) {
+	cursor, err := c.FindFields(query, fields, 0, 1)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close()
+	return cursor.Next(), nil
+}
+
 // FindAll returns all documents in c matching a query.
 func (c *Collection) FindAll(query Query) (*Cursor, os.Error) {
 	return c.Find(query, 0, 0)
