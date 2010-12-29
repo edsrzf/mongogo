@@ -3,14 +3,19 @@ Mongogo
 
 Mongogo is a MongoDB driver for the [Go programming language](http://golang.org/).
 
-This project is still in development. It's not well tested, but the basics seem to
-work well enough.
+This project is still in development. It's been tested on Arch and Ubuntu Linux for
+the amd64 architecture, but there's no reason it shouldn't work on other architectures
+as well.
 
 Dependencies
 ------------
 
-Mongogo's sole external dependency is [Go-BSON](go-bson).
+Mongogo compiles with Go release 2010-10-27 or newer, barring any recent language or
+library changes.
 
+Mongogo works with MongoDB version 2.6 or newer. It may partially work with older versions.
+
+Mongogo's only non-core Go dependency is [Go-BSON](go-bson).
 You can install it with goinstall by running
     goinstall github.com/edsrzf/go-bson
 
