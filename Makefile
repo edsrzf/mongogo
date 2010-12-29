@@ -10,6 +10,7 @@ GOFILES=\
 	conn.go\
 	cursor.go\
 	database.go\
+	error.go\
 	query.go\
 
 include $(GOROOT)/src/Make.pkg
