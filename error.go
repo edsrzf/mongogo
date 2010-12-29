@@ -8,14 +8,14 @@ package mongo
 // if err, ok := err.(mongo.connError); ok {
 // 	...
 // }
-type connError struct {
+type ConnError struct {
 	str string
 }
 
-func NewConnError(s string) *connError {
-	return &connError{str: s}
+func NewConnError(s string) *ConnError {
+	return &ConnError{str: s}
 }
 
-func (this *connError) String() string {
+func (this *ConnError) String() string {
 	return this.str
 }
