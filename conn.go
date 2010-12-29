@@ -35,7 +35,7 @@ type reply struct {
 func Dial(addr string) (*Conn, os.Error) {
 	c, err := net.Dial("tcp", "", addr)
 	if err != nil {
-		return nil, NewConnError(err)
+		return nil, NewConnError(err.String())
 	}
 	return &Conn{c}, nil
 }
@@ -44,7 +44,7 @@ func Dial(addr string) (*Conn, os.Error) {
 func (c *Conn) Close() os.Error {
 	err := c.conn.Close()
 	if err != nil {
-		return NewConnError(err)
+		return NewConnError(err.String())
 	}
 	return nil
 }
@@ -66,19 +66,22 @@ func (c *Conn) sendMessage(opCode, responseId int32, message []byte) os.Error {
 	binary.Write(buf, order, opCode)
 	message = message[:messageLength]
 	_, err := c.conn.Write(message)
-	return NewConnError(err)
+	if err != nil {
+		return NewConnError(err.String())
+	}
+	return nil
 }
 
 func (c *Conn) readReply() (*reply, os.Error) {
 	var size uint32
 	err := binary.Read(c.conn, order, &size)
 	if err != nil {
-		return nil, NewConnError(err)
+		return nil, NewConnError(err.String())
 	}
 	raw := make([]byte, size)
 	_, err = c.conn.Read(raw)
 	if err != nil {
-		return nil, NewConnError(err)
+		return nil, NewConnError(err.String())
 	}
 	buf := bytes.NewBuffer(raw)
 	r := new(reply)

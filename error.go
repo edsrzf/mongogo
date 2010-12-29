@@ -1,9 +1,5 @@
 package mongo
 
-import (
-	"os"
-)
-
 // Conforms to os.Error interface.
 // This error is returned when the error is connection related.
 //
@@ -16,8 +12,8 @@ type connError struct {
 	str string
 }
 
-func NewConnError(err os.Error) *connError {
-	return &connError{str: err.String()}
+func NewConnError(s string) *connError {
+	return &connError{str: s}
 }
 
 func (this *connError) String() string {
