@@ -16,6 +16,11 @@ import (
 
 var order = binary.LittleEndian
 
+// ConnError is an error related to the connection to the MongoDB server.
+type ConnError string
+
+func (e ConnError) String() string { return string(e) }
+
 // A Conn represents a connection to a MongoDB server.
 type Conn struct {
 	conn net.Conn
@@ -35,14 +40,18 @@ type reply struct {
 func Dial(addr string) (*Conn, os.Error) {
 	c, err := net.Dial("tcp", "", addr)
 	if err != nil {
-		return nil, err
+		return nil, ConnError(err.String())
 	}
 	return &Conn{c}, nil
 }
 
 // Close closes the connection.
 func (c *Conn) Close() os.Error {
-	return c.conn.Close()
+	err := c.conn.Close()
+	if err != nil {
+		return ConnError(err.String())
+	}
+	return nil
 }
 
 // Database returns the Database object for a name.
@@ -62,19 +71,22 @@ func (c *Conn) sendMessage(opCode, responseId int32, message []byte) os.Error {
 	binary.Write(buf, order, opCode)
 	message = message[:messageLength]
 	_, err := c.conn.Write(message)
-	return err
+	if err != nil {
+		return ConnError(err.String())
+	}
+	return nil
 }
 
 func (c *Conn) readReply() (*reply, os.Error) {
 	var size uint32
 	err := binary.Read(c.conn, order, &size)
 	if err != nil {
-		return nil, err
+		return nil, ConnError(err.String())
 	}
 	raw := make([]byte, size)
 	_, err = c.conn.Read(raw)
 	if err != nil {
-		return nil, err
+		return nil, ConnError(err.String())
 	}
 	buf := bytes.NewBuffer(raw)
 	r := new(reply)
