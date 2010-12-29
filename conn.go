@@ -35,14 +35,18 @@ type reply struct {
 func Dial(addr string) (*Conn, os.Error) {
 	c, err := net.Dial("tcp", "", addr)
 	if err != nil {
-		return nil, err
+		return nil, NewConnError(err)
 	}
 	return &Conn{c}, nil
 }
 
 // Close closes the connection.
 func (c *Conn) Close() os.Error {
-	return c.conn.Close()
+	err := c.conn.Close()
+	if err != nil {
+		return NewConnError(err)
+	}
+	return nil
 }
 
 // Database returns the Database object for a name.
