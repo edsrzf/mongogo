@@ -5,7 +5,7 @@ package mongo
 //
 // Example usage:
 // err := mongo.Insert(... )
-// if err, ok := err.(mongo.ConnError); ok {
+// if err, ok := err.(*mongo.ConnError); ok {
 // 	...
 // }
 type ConnError struct {
