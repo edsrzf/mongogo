@@ -6,6 +6,7 @@ package mongo
 
 import (
 	"os"
+	"reflect"
 	"github.com/edsrzf/go-bson"
 )
 
@@ -16,54 +17,85 @@ type Database struct {
 }
 
 // Collection returns a Collection specified by name.
-func (db *Database) Collection(name string) *Collection {
-	return &Collection{db, name, []byte(db.name + "." + name + "\x00")}
+// The form parameter specifies the type to use for query results. It should be
+// a poitner to a map with a string key type or a struct. If form is nil, the type
+// map[string]interface{} will be used.
+func (db *Database) Collection(name string, form interface{}) (*Collection, os.Error) {
+	if form == nil {
+		form = new(map[string]interface{})
+	}
+	ptrType, ok := reflect.Typeof(form).(*reflect.PtrType)
+	if !ok {
+		return nil, os.NewError("form must be a pointer type")
+	}
+	return &Collection{db, name, ptrType, []byte(db.name + "." + name + "\x00")}, nil
 }
 
 // Drop deletes db.
 func (db *Database) Drop() os.Error {
-	cmd := Query{"dropDatabase": int32(1)}
-	_, err := db.Command(cmd)
+	cmd := Query{"dropDatabase": 1}
+	_, err := db.Command(cmd, struct{}{})
 	return err
 }
 
 // Eval evaluates a JavaScript expression or function on the MongoDB server.
-func (db *Database) Eval(code *bson.JavaScript, args string) (bson.Doc, os.Error) {
+func (db *Database) Eval(code *bson.JavaScript, args string) (interface{}, os.Error) {
 	cmd := Query{"$eval": code}
 	if args != "" {
 		cmd["args"] = args
 	}
-	return db.Command(cmd)
+	reply, err := db.Command(cmd, nil)
+	return reply.(map[string]interface{})["retval"], err
+}
+
+// A Stats structure provides statistical information about a database.
+type Stats struct {
+	Collections int "collections"
+	Objects int "objects"
+	AvgObjSize float64 "avgObjSize"
+	DataSize int "dataSize"
+	StorageSize int "storageSize"
+	NumExtents int "numExtents"
+	Indexes int "indexes"
+	IndexSize int "indexSize"
+	FileSize int64 "fileSize"
 }
 
 // Stats returns database statistics for db.
-func (db *Database) Stats() (bson.Doc, os.Error) {
-	cmd := Query{"dbstats": int32(1)}
-	return db.Command(cmd)
+func (db *Database) Stats() (*Stats, os.Error) {
+	cmd := Query{"dbstats": 1}
+	s := new(Stats)
+	iface, err := db.Command(cmd, s)
+	return iface.(*Stats), err
 }
 
 // Repair checks for and repairs corruption in the database.
 func (db *Database) Repair() os.Error {
-	cmd := Query{"repairDatabase": int32(1)}
-	_, err := db.Command(cmd)
+	cmd := Query{"repairDatabase": 1}
+	_, err := db.Command(cmd, struct{}{})
 	return err
 }
 
 // Command sends an arbitrary command to the database.
 // It is equivalent to
-//	col := db.Collection("$cmd")
-//	doc := col.FindOne(cmd)
+//	col, err := db.Collection("$cmd", form)
+//	result, err = col.FindOne(cmd)
 // If the $err key is not null in the reply, Command returns an error.
-func (db *Database) Command(cmd Query) (bson.Doc, os.Error) {
-	col := db.Collection("$cmd")
-	reply, err := col.FindOne(cmd)
-	if reply["$err"] != nil {
+func (db *Database) Command(cmd Query, form interface{}) (result interface{}, err os.Error) {
+	col, err := db.Collection("$cmd", form)
+	if err != nil {
+		return nil, err
+	}
+	result, err = col.FindOne(cmd)
+	// TODO: do a better job of handling errors
+	reply, ok := result.(map[string]interface{})
+	if ok && reply["$err"] != nil {
 		msg, ok := reply["$err"].(string)
 		if !ok {
 			// this probably shouldn't ever happen
 			msg = "non-string error message"
 		}
-		return nil, os.NewError(msg)
+		err = os.NewError(msg)
 	}
-	return reply, err
+	return
 }

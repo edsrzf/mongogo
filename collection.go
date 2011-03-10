@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"os"
+	"reflect"
 	"github.com/edsrzf/go-bson"
 )
 
@@ -19,39 +20,40 @@ const headerSize = 16
 type Collection struct {
 	db       *Database
 	name     string
+	form     *reflect.PtrType
 	fullName []byte
 }
 
 // Drop deletes c from the database.
 func (c *Collection) Drop() os.Error {
 	cmd := Query{"drop": string(c.fullName)}
-	_, err := c.db.Command(cmd)
+	_, err := c.db.Command(cmd, struct{}{})
 	return err
 }
 
 // Update updates a single document selected by query, according to doc.
-func (c *Collection) Update(query, doc bson.Doc) os.Error {
+func (c *Collection) Update(query, doc interface{}) os.Error {
 	return c.update(query, doc, false, false)
 }
 
 // Upsert updates or inserts a single document selected by query,
 // according to doc.
-func (c *Collection) Upsert(query, doc bson.Doc) os.Error {
+func (c *Collection) Upsert(query, doc interface{}) os.Error {
 	return c.update(query, doc, true, false)
 }
 
 // Update updates multiple documents selected by query, according to doc.
-func (c *Collection) UpdateAll(query, doc bson.Doc) os.Error {
+func (c *Collection) UpdateAll(query, doc interface{}) os.Error {
 	return c.update(query, doc, false, true)
 }
 
 // UpsertAll updates or inserts multiple documents selected by query,
 // according to doc.
-func (c *Collection) UpsertAll(query, doc bson.Doc) os.Error {
+func (c *Collection) UpsertAll(query, doc interface{}) os.Error {
 	return c.update(query, doc, true, true)
 }
 
-func (c *Collection) update(query, doc bson.Doc, upsert, multi bool) os.Error {
+func (c *Collection) update(query, doc interface{}, upsert, multi bool) os.Error {
 	selData, err := bson.Marshal(query)
 	if err != nil {
 		return err
@@ -79,7 +81,7 @@ func (c *Collection) update(query, doc bson.Doc, upsert, multi bool) os.Error {
 }
 
 // Insert creates a new document in c.
-func (c *Collection) Insert(doc bson.Doc) os.Error {
+func (c *Collection) Insert(doc interface{}) os.Error {
 	data, err := bson.Marshal(doc)
 	if err != nil {
 		return err
@@ -107,13 +109,13 @@ func (c *Collection) Find(query Query, skip, limit int32) (*Cursor, os.Error) {
 // values will be excluded.
 func (c *Collection) FindFields(query Query, fields map[string]interface{}, skip, limit int32) (*Cursor, os.Error) {
 	conn := c.db.conn
-	data, err := bson.Marshal(bson.Doc(query))
+	data, err := bson.Marshal(query)
 	if err != nil {
 		return nil, err
 	}
 	var fieldData []byte
 	if fields != nil {
-		fieldData, err = bson.Marshal(bson.Doc(fields))
+		fieldData, err = bson.Marshal(fields)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +135,7 @@ func (c *Collection) FindFields(query Query, fields map[string]interface{}, skip
 		return nil, err
 	}
 
-	reply, err := conn.readReply()
+	reply, err := conn.readReply(c.form)
 	if err != nil {
 		return nil, err
 	}
@@ -141,15 +143,15 @@ func (c *Collection) FindFields(query Query, fields map[string]interface{}, skip
 	return &Cursor{c, reply.cursorID, 0, reply.docs}, nil
 }
 
-// FindOneFields performs a query that returns only speciied fields from one
+// FindOneFields performs a query that returns only specified fields from one
 // document.
-func (c *Collection) FindOneFields(query Query, fields map[string]interface{}) (bson.Doc, os.Error) {
+func (c *Collection) FindOneFields(query Query, fields map[string]interface{}) (interface{}, os.Error) {
 	cursor, err := c.FindFields(query, fields, 0, 1)
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close()
-	return cursor.Next(), nil
+	doc := cursor.Next()
+	return doc, cursor.Close()
 }
 
 // FindAll returns all documents in c matching a query.
@@ -158,28 +160,29 @@ func (c *Collection) FindAll(query Query) (*Cursor, os.Error) {
 }
 
 // FindOne returns the first document in c that matches a query.
-func (c *Collection) FindOne(query Query) (bson.Doc, os.Error) {
+func (c *Collection) FindOne(query Query) (interface{}, os.Error) {
 	cursor, err := c.Find(query, 0, 1)
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close()
-	return cursor.Next(), nil
+	doc := cursor.Next()
+	return doc, cursor.Close()
 }
 
 // Count returns the number of documents in c that match a query.
-func (c *Collection) Count(query bson.Doc) (int64, os.Error) {
+func (c *Collection) Count(query Query) (int64, os.Error) {
 	cmd := Query{"count": c.name, "query": query}
-	reply, err := c.db.Command(cmd)
-	if reply == nil || err != nil {
+	result, err := c.db.Command(cmd, nil)
+	if result == nil || err != nil {
 		return -1, err
 	}
+	reply := result.(*map[string]interface{})
 
 	// NOTE(eds): Mongo returns count as a double? Really? That seems silly.
-	return int64(reply["n"].(float64)), nil
+	return int64((*reply)["n"].(float64)), nil
 }
 
-func (c *Collection) remove(query bson.Doc, singleRemove bool) os.Error {
+func (c *Collection) remove(query Query, singleRemove bool) os.Error {
 	data, err := bson.Marshal(query)
 	if err != nil {
 		return err
@@ -195,19 +198,19 @@ func (c *Collection) remove(query bson.Doc, singleRemove bool) os.Error {
 }
 
 // Remove removes all documents in c that match a query.
-func (c *Collection) Remove(query bson.Doc) os.Error {
+func (c *Collection) Remove(query Query) os.Error {
 	return c.remove(query, false)
 }
 
 // RemoveFirst removes the first document in c that matches a query.
-func (c *Collection) RemoveFirst(query bson.Doc) os.Error {
+func (c *Collection) RemoveFirst(query Query) os.Error {
 	return c.remove(query, true)
 }
 
 // EnsureIndex ensures that an index exists on this collection.
 func (c *Collection) EnsureIndex(name string, keys map[string]int32, unique bool) os.Error {
-	col := c.db.Collection("system.indexes")
-	id := bson.Doc{"name": name, "ns": string(c.fullName), "key": keys, "unique": unique}
+	col, _ := c.db.Collection("system.indexes", nil)
+	id := map[string]interface{}{"name": name, "ns": string(c.fullName), "key": keys, "unique": unique}
 	return col.Insert(id)
 }
 
@@ -219,6 +222,6 @@ func (c *Collection) DropIndexes() os.Error {
 // DropIndex deletes a single index.
 func (c *Collection) DropIndex(name string) os.Error {
 	cmd := Query{"deleteIndexes": string(c.fullName), "index": name}
-	_, err := c.db.Command(cmd)
+	_, err := c.db.Command(cmd, struct{}{})
 	return err
 }

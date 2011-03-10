@@ -11,6 +11,7 @@ import (
 	"os"
 	"net"
 	"rand"
+	"reflect"
 	"github.com/edsrzf/go-bson"
 )
 
@@ -33,7 +34,7 @@ type reply struct {
 	cursorID       int64
 	startingFrom   int32
 	numberReturned int32
-	docs           []bson.Doc
+	docs           []interface{}
 }
 
 // Dial connects to a MongoDB server at the remote address addr.
@@ -77,7 +78,7 @@ func (c *Conn) sendMessage(opCode, responseId int32, message []byte) os.Error {
 	return nil
 }
 
-func (c *Conn) readReply() (*reply, os.Error) {
+func (c *Conn) readReply(form *reflect.PtrType) (*reply, os.Error) {
 	var size uint32
 	err := binary.Read(c.conn, order, &size)
 	if err != nil {
@@ -101,11 +102,16 @@ func (c *Conn) readReply() (*reply, os.Error) {
 	binary.Read(buf, order, &r.cursorID)
 	binary.Read(buf, order, &r.startingFrom)
 	binary.Read(buf, order, &r.numberReturned)
-	r.docs = make([]bson.Doc, r.numberReturned)
+	elType := form.Elem()
+	r.docs = make([]interface{}, r.numberReturned)
 	for i := range r.docs {
 		raw := buf.Bytes()
 		size := order.Uint32(raw)
-		r.docs[i], err = bson.Unmarshal(raw)
+		doc := reflect.MakeZero(elType)
+		ptr := reflect.MakeZero(form)
+		ptr.(*reflect.PtrValue).PointTo(doc)
+		r.docs[i] = ptr.Interface()
+		err = bson.Unmarshal(raw, r.docs[i])
 		if err != nil {
 			break
 		}

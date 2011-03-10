@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"os"
-	"github.com/edsrzf/go-bson"
 )
 
 // A Cursor is the result of a query.
@@ -16,29 +15,28 @@ type Cursor struct {
 	collection *Collection
 	id         int64
 	pos        int
-	docs       []bson.Doc
+	docs       []interface{}
 }
 
 // Peek returns the next document or nil if the Cursor is at the end.
-func (c *Cursor) Peek() bson.Doc {
-	if !c.HasNext() {
+func (c *Cursor) Peek() interface{} {
+	if !c.More() {
 		return nil
 	}
 	return c.docs[c.pos]
 }
 
 // Next is like Peek, but also iterates to the next document.
-func (c *Cursor) Next() bson.Doc {
-	if !c.HasNext() {
-		return nil
+func (c *Cursor) Next() interface{} {
+	doc := c.Peek()
+	if doc != nil {
+		c.pos++
 	}
-	doc := c.docs[c.pos]
-	c.pos++
 	return doc
 }
 
-// HasNext indicates whether the Cursor still has more documents to iterate through.
-func (c *Cursor) HasNext() bool {
+// More indicates whether the Cursor still has more documents to iterate through.
+func (c *Cursor) More() bool {
 	if c.pos < len(c.docs) {
 		return true
 	}
@@ -68,7 +66,7 @@ func (c *Cursor) getMore(limit int32) os.Error {
 		return err
 	}
 
-	reply, err := conn.readReply()
+	reply, err := conn.readReply(c.collection.form)
 	if err != nil {
 		return err
 	}
